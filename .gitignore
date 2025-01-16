@@ -14,6 +14,7 @@ kernelmemfs
 mkfs/mkfs
 kernel/kernel
 user/usys.S
+.cache
 .gdbinit
 *.zip
 xv6.out*
@@ -25,3 +26,5 @@ barrier
 .DS_Store
 *.dSYM
 *.pcap
+tags
+compile_commands.json

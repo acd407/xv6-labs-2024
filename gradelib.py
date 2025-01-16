@@ -1,8 +1,19 @@
 from __future__ import print_function
 
-import sys, os, re, time, socket, select, subprocess, errno, shutil, random, string, json
-from subprocess import check_call, Popen
+import errno
+import json
+import os
+import random
+import re
+import select
+import shutil
+import socket
+import string
+import subprocess
+import sys
+import time
 from optparse import OptionParser
+from subprocess import Popen
 
 __all__ = []
 
@@ -17,6 +28,7 @@ TOTAL = POSSIBLE = 0
 PART_TOTAL = PART_POSSIBLE = 0
 CURRENT_TEST = None
 GRADES = {}
+
 
 def test(points, title=None, parent=None):
     """Decorator for declaring test functions.  If title is None, the
@@ -52,7 +64,7 @@ def test(points, title=None, parent=None):
             sys.stdout.flush()
             try:
                 if parent_failed:
-                    raise AssertionError('Parent failed: %s' % parent.__name__)
+                    raise AssertionError("Parent failed: %s" % parent.__name__)
                 fn()
             except AssertionError as e:
                 fail = str(e)
@@ -60,10 +72,14 @@ def test(points, title=None, parent=None):
             # Display and handle test result
             POSSIBLE += points
             if points:
-                print("%s: %s" % (title, \
-                    (color("red", "FAIL") if fail else color("green", "OK"))), end=' ')
+                print(
+                    "%s: %s" %
+                    (title,
+                     (color("red", "FAIL") if fail else color("green", "OK"))),
+                    end=" ",
+                )
             if time.time() - start > 0.1:
-                print("(%.1fs)" % (time.time() - start), end=' ')
+                print("(%.1fs)" % (time.time() - start), end=" ")
             print()
             if fail:
                 print("    %s" % fail.replace("\n", "\n    "))
@@ -87,17 +103,22 @@ def test(points, title=None, parent=None):
         run_test.on_finish = []
         TESTS.append(run_test)
         return run_test
+
     return register_test
 
+
 def end_part(name):
+
     def show_part():
         global PART_TOTAL, PART_POSSIBLE
-        print("Part %s score: %d/%d" % \
-            (name, TOTAL - PART_TOTAL, POSSIBLE - PART_POSSIBLE))
+        print("Part %s score: %d/%d" %
+              (name, TOTAL - PART_TOTAL, POSSIBLE - PART_POSSIBLE))
         print()
         PART_TOTAL, PART_POSSIBLE = TOTAL, POSSIBLE
+
     show_part.title = ""
     TESTS.append(show_part)
+
 
 def write_results():
     global options
@@ -109,16 +130,23 @@ def write_results():
     except OSError as e:
         print("Provided a bad results path. Error:", e)
 
+
 def run_tests():
     """Set up for testing and run the registered test functions."""
 
     # Handle command line
     global options
     parser = OptionParser(usage="usage: %prog [-v] [filters...]")
-    parser.add_option("-v", "--verbose", action="store_true",
+    parser.add_option("-v",
+                      "--verbose",
+                      action="store_true",
                       help="print commands")
-    parser.add_option("--color", choices=["never", "always", "auto"],
-                      default="auto", help="never, always, or auto")
+    parser.add_option(
+        "--color",
+        choices=["never", "always", "auto"],
+        default="auto",
+        help="never, always, or auto",
+    )
     parser.add_option("--results", help="results file path")
     (options, args) = parser.parse_args()
 
@@ -142,10 +170,12 @@ def run_tests():
     if TOTAL < POSSIBLE:
         sys.exit(1)
 
+
 def get_current_test():
     if not CURRENT_TEST:
         raise RuntimeError("No test is running")
     return CURRENT_TEST
+
 
 ##################################################################
 # Assertions
@@ -153,14 +183,16 @@ def get_current_test():
 
 __all__ += ["assert_equal", "assert_lines_match"]
 
+
 def assert_equal(got, expect, msg=""):
     if got == expect:
         return
     if msg:
         msg += "\n"
     raise AssertionError("%sgot:\n  %s\nexpected:\n  %s" %
-                         (msg, str(got).replace("\n", "\n  "),
-                          str(expect).replace("\n", "\n  ")))
+                         (msg, str(got).replace(
+                             "\n", "\n  "), str(expect).replace("\n", "\n  ")))
+
 
 def assert_lines_match(text, *regexps, **kw):
     """Assert that all of regexps match some line in text.  If a 'no'
@@ -169,6 +201,7 @@ def assert_lines_match(text, *regexps, **kw):
 
     def assert_lines_match_kw(no=[]):
         return no
+
     no = assert_lines_match_kw(**kw)
 
     # Check text against regexps
@@ -200,10 +233,11 @@ def assert_lines_match(text, *regexps, **kw):
             if lineno != last + 1:
                 msg.append("...")
             last = lineno
-            msg.append("%s %s" % (color("red", "BAD ") if lineno in bad else
-                                  color("green", "GOOD") if lineno in good
-                                  else "    ",
-                                  lines[lineno]))
+            msg.append("%s %s" % (
+                (color("red", "BAD ") if lineno in bad else
+                 color("green", "GOOD") if lineno in good else "    "),
+                lines[lineno],
+            ))
     if last != len(lines) - 1:
         msg.append("...")
     if bad:
@@ -212,18 +246,29 @@ def assert_lines_match(text, *regexps, **kw):
         msg.append(color("red", "MISSING") + " '%s'" % r)
     raise AssertionError("\n".join(msg))
 
+
 ##################################################################
 # Utilities
 #
 
-__all__ += ["make", "maybe_unlink", "reset_fs", "color", "random_str", "check_time", "check_answers"]
+__all__ += [
+    "make",
+    "maybe_unlink",
+    "reset_fs",
+    "color",
+    "random_str",
+    "check_time",
+    "check_answers",
+]
 
 MAKE_TIMESTAMP = 0
+
 
 def pre_make():
     """Delay prior to running make to ensure file mtimes change."""
     while int(time.time()) == MAKE_TIMESTAMP:
         time.sleep(0.1)
+
 
 def post_make():
     """Record the time after make completes so that the next run of
@@ -231,15 +276,19 @@ def post_make():
     global MAKE_TIMESTAMP
     MAKE_TIMESTAMP = int(time.time())
 
+
 def make(*target):
     pre_make()
-    if Popen(("make",) + target).wait():
+    if Popen(("make", ) + target).wait():
         sys.exit(1)
     post_make()
 
+
 def show_command(cmd):
-    from pipes import quote
+    from shlex import quote
+
     print("\n$", " ".join(map(quote, cmd)))
+
 
 def maybe_unlink(*paths):
     for path in paths:
@@ -249,30 +298,38 @@ def maybe_unlink(*paths):
             if e.errno != errno.ENOENT:
                 raise
 
+
 COLORS = {"default": "\033[0m", "red": "\033[31m", "green": "\033[32m"}
+
 
 def color(name, text):
     if options.color == "always" or (options.color == "auto" and os.isatty(1)):
         return COLORS[name] + text + COLORS["default"]
     return text
 
+
 def reset_fs():
     if os.path.exists("obj/fs/clean-fs.img"):
         shutil.copyfile("obj/fs/clean-fs.img", "obj/fs/fs.img")
 
+
 def random_str(n=8):
     letters = string.ascii_letters + string.digits
-    return ''.join(random.choice(letters) for _ in range(n))
+    return "".join(random.choice(letters) for _ in range(n))
+
 
 def check_time():
     try:
         print("")
-        with open('time.txt') as f:
+        with open("time.txt") as f:
             d = f.read().strip()
-            if not re.match(r'^\d+$', d):
-                raise AssertionError('time.txt does not contain a single integer (number of hours spent on the lab)')
+            if not re.match(r"^\d+$", d):
+                raise AssertionError(
+                    "time.txt does not contain a single integer (number of hours spent on the lab)"
+                )
     except IOError:
-        raise AssertionError('Cannot read time.txt')
+        raise AssertionError("Cannot read time.txt")
+
 
 def check_answers(file, n=10):
     try:
@@ -280,9 +337,10 @@ def check_answers(file, n=10):
         with open(file) as f:
             d = f.read().strip()
             if len(d) < n:
-                raise AssertionError('%s does not seem to contain enough text' % file)
+                raise AssertionError(
+                    "%s does not seem to contain enough text" % file)
     except IOError:
-        raise AssertionError('Cannot read %s' % file)
+        raise AssertionError("Cannot read %s" % file)
 
 
 ##################################################################
@@ -290,6 +348,7 @@ def check_answers(file, n=10):
 #
 
 __all__ += ["QEMU", "GDBClient"]
+
 
 class QEMU(object):
     _GDBPORT = None
@@ -301,16 +360,20 @@ class QEMU(object):
         except socket.error:
             pass
         else:
-            print("""\
+            print(
+                """\
 GDB stub found on port %d.
 QEMU appears to already be running.  Please exit it if possible or use
-'killall qemu' or 'killall qemu.real'.""" % self.get_gdb_port(), file=sys.stderr)
+'killall qemu' or 'killall qemu.real'.""" % self.get_gdb_port(),
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         if options.verbose:
-            show_command(("make",) + make_args)
+            show_command(("make", ) + make_args)
         cmd = ("make", "-s", "--no-print-directory") + make_args
-        self.proc = Popen(cmd, stdout=subprocess.PIPE,
+        self.proc = Popen(cmd,
+                          stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT,
                           stdin=subprocess.PIPE)
         # Accumulated output as a string
@@ -322,8 +385,10 @@ QEMU appears to already be running.  Please exit it if possible or use
     @staticmethod
     def get_gdb_port():
         if QEMU._GDBPORT is None:
-            p = Popen(["make", "-s", "--no-print-directory", "print-gdbport"],
-                      stdout=subprocess.PIPE)
+            p = Popen(
+                ["make", "-s", "--no-print-directory", "print-gdbport"],
+                stdout=subprocess.PIPE,
+            )
             (out, _) = p.communicate()
             if p.returncode:
                 raise RuntimeError(
@@ -348,7 +413,7 @@ QEMU appears to already be running.  Please exit it if possible or use
 
     def write(self, buf):
         if isinstance(buf, str):
-            buf = buf.encode('utf-8')
+            buf = buf.encode("utf-8")
         self.proc.stdin.write(buf)
         self.proc.stdin.flush()
 
@@ -361,7 +426,9 @@ QEMU appears to already be running.  Please exit it if possible or use
         if self.proc:
             self.proc.terminate()
 
+
 class GDBClient(object):
+
     def __init__(self, port, timeout=15):
         start = time.time()
         while True:
@@ -426,10 +493,13 @@ class GDBClient(object):
 
 __all__ += ["TerminateTest", "Runner"]
 
+
 class TerminateTest(Exception):
     pass
 
-class Runner():
+
+class Runner:
+
     def __init__(self, *default_monitors):
         self.__default_monitors = default_monitors
 
@@ -444,6 +514,7 @@ class Runner():
 
         def run_qemu_kw(target_base="qemu", make_args=[], timeout=30):
             return target_base, make_args, timeout
+
         target_base, make_args, timeout = run_qemu_kw(**kw)
 
         # Start QEMU
@@ -535,11 +606,15 @@ Failed to shutdown QEMU.  You might need to 'killall qemu' or
 
         assert_lines_match(self.qemu.output, *args, **kwargs)
 
+
 ##################################################################
 # Monitors
 #
 
-__all__ += ["save", "stop_breakpoint", "call_on_line", "stop_on_line", "shell_script"]
+__all__ += [
+    "save", "stop_breakpoint", "call_on_line", "stop_on_line", "shell_script"
+]
+
 
 def save(path):
     """Return a monitor that writes QEMU's output to path.  If the
@@ -564,19 +639,24 @@ def save(path):
     f = open(path, "wb")
     return setup_save
 
+
 def stop_breakpoint(addr):
     """Returns a monitor that stops when addr is reached.  addr may be
     a number or the name of a symbol."""
 
     def setup_breakpoint(runner):
         if isinstance(addr, str):
-            addrs = [int(sym[:16], 16) for sym in open("kernel/kernel.sym")
-                     if sym[17:].strip() == addr]
+            addrs = [
+                int(sym[:16], 16) for sym in open("kernel/kernel.sym")
+                if sym[17:].strip() == addr
+            ]
             assert len(addrs), "Symbol %s not found" % addr
             runner.gdb.breakpoint(addrs[0])
         else:
             runner.gdb.breakpoint(addr)
+
     return setup_breakpoint
+
 
 def call_on_line(regexp, callback):
     """Returns a monitor that calls 'callback' when QEMU prints a line
@@ -584,6 +664,7 @@ def call_on_line(regexp, callback):
 
     def setup_call_on_line(runner):
         buf = bytearray()
+
         def handle_output(output):
             buf.extend(output)
             while b"\n" in buf:
@@ -591,8 +672,11 @@ def call_on_line(regexp, callback):
                 line = line.decode("utf-8", "replace")
                 if re.match(regexp, line):
                     callback(line)
+
         runner.qemu.on_output.append(handle_output)
+
     return setup_call_on_line
+
 
 def stop_on_line(regexp):
     """Returns a monitor that stops when QEMU prints a line matching
@@ -600,29 +684,36 @@ def stop_on_line(regexp):
 
     def stop(line):
         raise TerminateTest
+
     return call_on_line(regexp, stop)
+
 
 def shell_script(script, terminate_match=None):
     """Returns a monitor that plays the script, and stops when the script is
     done executing."""
 
     def setup_call_on_line(runner):
+
         class context:
             n = 0
             buf = bytearray()
+
         def handle_output(output):
             context.buf.extend(output)
             if terminate_match is not None:
-                if re.match(terminate_match, context.buf.decode('utf-8', 'replace')):
+                if re.match(terminate_match,
+                            context.buf.decode("utf-8", "replace")):
                     raise TerminateTest
-            if b'$ ' in context.buf:
+            if b"$ " in context.buf:
                 context.buf = bytearray()
                 if context.n < len(script):
                     runner.qemu.write(script[context.n])
-                    runner.qemu.write('\n')
+                    runner.qemu.write("\n")
                     context.n += 1
                 else:
                     if terminate_match is None:
                         raise TerminateTest
+
         runner.qemu.on_output.append(handle_output)
+
     return setup_call_on_line

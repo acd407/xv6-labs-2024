@@ -10,7 +10,7 @@ int main (int argc, char *argv[]) {
     if (fork()) {
         write (fdf2c[1], "ping", 4);
         read (fdc2f[0], s, 4);
-        wait(0);
+        wait (0);
         printf ("%d: received %s\n", getpid(), s);
     } else {
         write (fdc2f[1], "pong", 4);
