@@ -270,6 +270,9 @@ int fork (void) {
     // copy saved user registers.
     *(np->trapframe) = *(p->trapframe);
 
+    // 设置子进程继承 trace 状态
+    np->trace = p->trace;
+
     // Cause fork to return 0 in the child.
     np->trapframe->a0 = 0;
 

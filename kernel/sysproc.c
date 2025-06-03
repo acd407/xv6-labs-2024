@@ -13,9 +13,13 @@ uint64 sys_exit (void) {
     return 0; // not reached
 }
 
-uint64 sys_getpid (void) { return myproc()->pid; }
+uint64 sys_getpid (void) {
+    return myproc ()->pid;
+}
 
-uint64 sys_fork (void) { return fork(); }
+uint64 sys_fork (void) {
+    return fork ();
+}
 
 uint64 sys_wait (void) {
     uint64 p;
@@ -28,7 +32,7 @@ uint64 sys_sbrk (void) {
     int n;
 
     argint (0, &n);
-    addr = myproc()->sz;
+    addr = myproc ()->sz;
     if (growproc (n) < 0)
         return -1;
     return addr;
@@ -44,7 +48,7 @@ uint64 sys_sleep (void) {
     acquire (&tickslock);
     ticks0 = ticks;
     while (ticks - ticks0 < n) {
-        if (killed (myproc())) {
+        if (killed (myproc ())) {
             release (&tickslock);
             return -1;
         }
@@ -70,4 +74,9 @@ uint64 sys_uptime (void) {
     xticks = ticks;
     release (&tickslock);
     return xticks;
+}
+
+uint64 sys_trace (void) {
+    argint (0, (int *) &(myproc ()->trace));
+    return 0;
 }
