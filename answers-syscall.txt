@@ -1,0 +1,5 @@
+usertrap
+7; SYS_exec
+user mode
+lw	s3,0(zero); s3
+initcode; 1
