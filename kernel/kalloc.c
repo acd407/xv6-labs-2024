@@ -10,6 +10,7 @@
 #include "defs.h"
 
 void freerange(void *pa_start, void *pa_end);
+void superfreerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
@@ -23,11 +24,18 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct {
+  struct spinlock lock;
+  struct run *freelist;  // 用于跟踪 2MB 块
+} khugepage;
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  initlock(&khugepage.lock, "khugepage");
+  freerange(end, (void*)PGSTOP); // 收拢空闲内存/初始化内存
+  superfreerange((void *)PGSTOP, (void*)PHYSTOP);
 }
 
 void
@@ -39,6 +47,15 @@ freerange(void *pa_start, void *pa_end)
     kfree(p);
 }
 
+void
+superfreerange(void *pa_start, void *pa_end)
+{
+  char *p;
+  p = (char*)SUPERPGROUNDUP((uint64)pa_start);
+  for(; p + SUPERPGSIZE <= (char*)pa_end; p += SUPERPGSIZE)
+    superfree(p);
+}
+
 // Free the page of physical memory pointed at by pa,
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
@@ -48,7 +65,7 @@ kfree(void *pa)
 {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PGSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
@@ -80,3 +97,39 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+void
+superfree(void *pa)
+{
+  struct run *r;
+
+  if(((uint64)pa % SUPERPGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+    panic("superfree");
+
+  // Fill with junk to catch dangling refs.
+  memset(pa, 1, SUPERPGSIZE);
+
+  r = (struct run*)pa;
+
+  acquire(&khugepage.lock);
+  r->next = khugepage.freelist;
+  khugepage.freelist = r;
+  release(&khugepage.lock);
+}
+
+void *
+superalloc(void)
+{
+  struct run *r;
+
+  acquire(&khugepage.lock);
+  r = khugepage.freelist;
+  if(r)
+    khugepage.freelist = r->next;
+  release(&khugepage.lock);
+
+  if(r)
+    memset((char*)r, 5, SUPERPGSIZE); // fill with junk
+  return (void*)r;
+}
+
