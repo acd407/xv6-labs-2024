@@ -176,3 +176,16 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void) {
+  uint64 fp = r_fp();
+  uint64 stack_top = PGROUNDUP(fp); // 栈顶（高地址）
+
+  // 遍历栈帧链
+  while (fp < stack_top) {
+    uint64 ra = *(uint64*)(fp - 8);  // fp-8 存储返回地址（ra）
+    printf("%p\n", (void*)ra);
+    fp = *(uint64*)(fp - 16);        // fp-16 存储上一个栈帧的 fp
+  }
+}

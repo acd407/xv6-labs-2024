@@ -25,3 +25,6 @@ barrier
 .DS_Store
 *.dSYM
 *.pcap
+.cache/clangd/index
+tags
+compile_commands.json

@@ -1,0 +1,5 @@
+a0-17; a2
+inlined
+6e2
+return value
+rld;0x726c6400;no
