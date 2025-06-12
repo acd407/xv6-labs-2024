@@ -23,6 +23,8 @@ struct {
   struct run *freelist;
 } kmem;
 
+char *cowcnt;
+
 void
 kinit()
 {
@@ -35,7 +37,9 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  cowcnt = p;
+  memset(cowcnt, 0, 8 * PGSIZE);
+  for(p += 8 * PGSIZE ; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
 }
 
