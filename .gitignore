@@ -15,3 +15,6 @@ mkfs
 kernel/kernel
 user/usys.S
 .gdbinit
+.cache/clangd/index
+compile_commands.json
+tags
