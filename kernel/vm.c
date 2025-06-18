@@ -192,8 +192,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not a leaf");
     if(do_free){
       uint64 pa = PTE2PA(*pte);
-      if (cowcnt[pa>>12] == 0)
-        kfree((void*)pa);
+      kfree((void*)pa);
     }
     *pte = 0;
   }
@@ -323,40 +322,17 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
-    cowcnt[pa>>12]++;
-    *pte |= PTE_C;
-    *pte &= ~PTE_W;
+    inc_ref((void *)pa);
+    if (*pte & PTE_W) {
+      *pte |= PTE_C;
+      *pte &= ~PTE_W;
+    }
     flags = PTE_FLAGS(*pte);
     if(mappages(new, i, PGSIZE, pa, flags) != 0){
       uvmunmap(new, 0, i / PGSIZE, 0);
       return -1;
     }
   }
-  return 0;
-}
-
-int
-uvmdeepcopy(pagetable_t old, uint64 va)
-{
-  pte_t *pte;
-  uint64 pa;
-  char *mem;
-
-  if((pte = walk(old, va, 0)) == 0)
-    panic("uvmcopy: pte should exist");
-  if((*pte & PTE_V) == 0)
-    panic("uvmcopy: page not present");
-  if(*pte & PTE_W)
-    panic("uvmcopy: page is writeable");
-  pa = PTE2PA(*pte);
-  cowcnt[pa>>12]--;
-  if (cowcnt[pa>>12] > 0) {
-    if((mem = kalloc()) == 0)
-      panic("uvmcopy: kalloc");
-    memmove(mem, (char*)pa, PGSIZE);
-    *pte = PA2PTE(mem) | PTE_FLAGS(*pte);
-  }
-  *pte = (*pte | PTE_W) & ~PTE_C;
   return 0;
 }
 
@@ -389,8 +365,29 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0)
       return -1;
-    if ((*pte & PTE_W) == 0 && (*pte & PTE_C))
-      uvmdeepcopy(pagetable, va0);
+    if (*pte & PTE_C){
+      char *mem = kalloc();
+      if (mem == 0)
+        return -1;
+
+      // 复制旧页面内容
+      pa0 = PTE2PA(*pte);
+      memmove(mem, (char *)pa0, PGSIZE);
+      uint flags = PTE_FLAGS(*pte);
+      flags &= ~PTE_C;
+      flags |= PTE_W;
+      *pte = PA2PTE(mem) | flags;
+      // 关于为什么使用 kfree 而不是 dec_ref
+      // 注意 pa0 是什么：pa0 <- pte <- va0 <- dstva
+      // 这就回到了基本问题：不应使用 dec_ref
+      // inc_ref 不与其他任何操作挂钩，而 dec_ref 要与内存释放挂钩
+      // 假如仅 dec_ref，后面未必有代码释放内存了，就造成内存泄露了
+      kfree((void*)pa0);
+      sfence_vma();
+    }
+    if ((*pte & PTE_W) == 0){
+      return-1;
+    }
     pa0 = PTE2PA(*pte);
     n = PGSIZE - (dstva - va0);
     if(n > len)

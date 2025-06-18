@@ -66,7 +66,43 @@ usertrap(void)
 
     syscall();
   } else if(r_scause() == 15){
-    uvmdeepcopy(p->pagetable, PGROUNDDOWN(r_stval()));
+    uint64 va=r_stval();
+    if (va >= MAXVA){
+      setkilled(p);
+      goto err;
+    }
+    pte_t *pte = walk(p->pagetable, va, 0);
+
+    if (pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ) {
+      setkilled(p);
+      goto err;
+    }
+    if (*pte & PTE_C) {
+      uint64 pa = PTE2PA(*pte);
+      if (get_ref((void *)pa) == 1) { // 没有与其他进程共享，就直接利用最后一页
+        *pte &= ~PTE_C;  // 清除 COW 位
+        *pte |= PTE_W;   // 设置写权限
+        sfence_vma();    // 刷新 TLB
+      } else { // 需要单独复制出来
+        char *mem = kalloc();
+        if (mem == 0) {
+          printf("usertrap(): kalloc failed!pid=%d\n", p->pid);
+          printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
+          setkilled(p);
+        }
+        memmove(mem, (char *)pa, PGSIZE);
+
+        uint64 flags = PTE_FLAGS(*pte);
+        flags &= ~PTE_C;
+        flags |= PTE_W;
+        *pte = PA2PTE(mem) | flags | PTE_V;
+        kfree((void *)pa);
+        sfence_vma();
+      }
+    } else {
+      printf("usertrap(): write to read-only page\n");
+      setkilled(p);
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
@@ -75,6 +111,7 @@ usertrap(void)
     setkilled(p);
   }
 
+err:
   if(killed(p))
     exit(-1);
 
