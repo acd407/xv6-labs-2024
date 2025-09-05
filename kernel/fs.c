@@ -416,6 +416,44 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
+  bn -= NINDIRECT;
+
+  if(bn < NDOUBLYINDIRECT - 1) {
+    // 3.1 检查二级间接块是否已分配
+    if((addr = ip->addrs[NDIRECT + 1]) == 0) {
+      addr = balloc(ip->dev);
+      if(addr == 0) return 0;
+      ip->addrs[NDIRECT + 1] = addr;
+    }
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    // 3.2 处理第一级索引（bn / 256）
+    uint idx1 = bn / NINDIRECT;
+    if((addr = a[idx1]) == 0) {
+      addr = balloc(ip->dev);
+      if(addr) {
+        a[idx1] = addr;
+        log_write(bp);  // 记录二级间接块的第一级修改
+      }
+    }
+    brelse(bp);
+
+    // 3.3 处理第二级索引（bn % 256）
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    uint idx2 = bn % NINDIRECT;
+    if((addr = a[idx2]) == 0) {
+      addr = balloc(ip->dev);
+      if(addr) {
+        a[idx2] = addr;
+        log_write(bp);  // 记录二级间接块的第二级修改
+      }
+    }
+    brelse(bp);
+    return addr;
+  } else if (bn == NDOUBLYINDIRECT - 1)
+    return 0;
 
   panic("bmap: out of range");
 }
